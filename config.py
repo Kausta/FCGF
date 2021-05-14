@@ -119,6 +119,11 @@ data_arg.add_argument(
     help='max time difference between pairs (non inclusive)')
 data_arg.add_argument('--kitti_date', type=str, default='2011_09_26')
 
+# London3d Parameters
+data_arg.add_argument('--london3d-cube-size', type=float, default=4.0)
+data_arg.add_argument('--london3d-interval', type=float, default=2.0)
+data_arg.add_argument('--london3d-min-percent', type=float, default=0.3)
+data_arg.add_argument('--london3d-max-percent', type=float, default=0.9)
 
 def get_config():
   args = parser.parse_args()

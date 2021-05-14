@@ -11,7 +11,8 @@ import glob
 import os
 from scipy.linalg import expm, norm
 
-from util.pointcloud import get_matching_indices, make_open3d_point_cloud
+from util.pointcloud import get_matching_indices, make_open3d_point_cloud, compute_overlap_ratio, roi_rectangle, \
+  get_rectangle_pcd
 import lib.transforms as t
 
 import MinkowskiEngine as ME
@@ -24,7 +25,7 @@ kitti_icp_cache = {}
 
 def collate_pair_fn(list_data):
   xyz0, xyz1, coords0, coords1, feats0, feats1, matching_inds, trans = list(
-      zip(*list_data))
+    zip(*list_data))
   xyz_batch0, xyz_batch1 = [], []
   matching_inds_batch, trans_batch, len_batch = [], [], []
 
@@ -40,7 +41,7 @@ def collate_pair_fn(list_data):
     trans_batch.append(torch.from_numpy(trans[batch_id]))
 
     matching_inds_batch.append(
-        torch.from_numpy(np.array(matching_inds[batch_id]) + curr_start_inds))
+      torch.from_numpy(np.array(matching_inds[batch_id]) + curr_start_inds))
     len_batch.append([N0, N1])
 
     # Move the head
@@ -57,15 +58,15 @@ def collate_pair_fn(list_data):
   matching_inds_batch = torch.cat(matching_inds_batch, 0).int()
 
   return {
-      'pcd0': xyz_batch0,
-      'pcd1': xyz_batch1,
-      'sinput0_C': coords_batch0,
-      'sinput0_F': feats_batch0,
-      'sinput1_C': coords_batch1,
-      'sinput1_F': feats_batch1,
-      'correspondences': matching_inds_batch,
-      'T_gt': trans_batch,
-      'len_batch': len_batch
+    'pcd0': xyz_batch0,
+    'pcd1': xyz_batch1,
+    'sinput0_C': coords_batch0,
+    'sinput0_F': feats_batch0,
+    'sinput1_C': coords_batch1,
+    'sinput1_F': feats_batch1,
+    'correspondences': matching_inds_batch,
+    'T_gt': trans_batch,
+    'len_batch': len_batch
   }
 
 
@@ -98,7 +99,7 @@ class PairDataset(torch.utils.data.Dataset):
     self.transform = transform
     self.voxel_size = config.voxel_size
     self.matching_search_voxel_size = \
-        config.voxel_size * config.positive_pair_search_voxel_size_multiplier
+      config.voxel_size * config.positive_pair_search_voxel_size_multiplier
 
     self.random_scale = random_scale
     self.min_scale = config.min_scale
@@ -164,7 +165,7 @@ class IndoorPairDataset(PairDataset):
 
     if self.random_scale and random.random() < 0.95:
       scale = self.min_scale + \
-          (self.max_scale - self.min_scale) * random.random()
+              (self.max_scale - self.min_scale) * random.random()
       matching_search_voxel_size *= scale
       xyz0 = scale * xyz0
       xyz1 = scale * xyz1
@@ -224,9 +225,9 @@ class IndoorPairDataset(PairDataset):
 class KITTIPairDataset(PairDataset):
   AUGMENT = None
   DATA_FILES = {
-      'train': './config/train_kitti.txt',
-      'val': './config/val_kitti.txt',
-      'test': './config/test_kitti.txt'
+    'train': './config/train_kitti.txt',
+    'val': './config/val_kitti.txt',
+    'test': './config/test_kitti.txt'
   }
   TEST_RANDOM_ROTATION = False
   IS_ODOMETRY = True
@@ -271,7 +272,7 @@ class KITTIPairDataset(PairDataset):
       fnames = glob.glob(self.root + '/' + self.date +
                          '_drive_%04d_sync/velodyne_points/data/*.bin' % drive_id)
     assert len(
-        fnames) > 0, f"Make sure that the path {self.root} has drive id: {drive_id}"
+      fnames) > 0, f"Make sure that the path {self.root} has drive id: {drive_id}"
     inames = [int(os.path.split(fname)[-1][:-4]) for fname in fnames]
     return inames
 
@@ -281,8 +282,8 @@ class KITTIPairDataset(PairDataset):
       velo2cam = self._velo2cam
     except AttributeError:
       R = np.array([
-          7.533745e-03, -9.999714e-01, -6.166020e-04, 1.480249e-02, 7.280733e-04,
-          -9.998902e-01, 9.998621e-01, 7.523790e-03, 1.480755e-02
+        7.533745e-03, -9.999714e-01, -6.166020e-04, 1.480249e-02, 7.280733e-04,
+        -9.998902e-01, 9.998621e-01, 7.523790e-03, 1.480755e-02
       ]).reshape(3, 3)
       T = np.array([-4.069766e-03, -7.631618e-02, -2.717806e-01]).reshape(3, 1)
       velo2cam = np.hstack([R, T])
@@ -356,15 +357,15 @@ class KITTIPairDataset(PairDataset):
     T0 = self.pos_transform(pos0)
     T1 = self.pos_transform(pos1)
     return (np.dot(T1, np.linalg.inv(T0)).T if not invert else np.dot(
-        np.linalg.inv(T1), T0).T)
+      np.linalg.inv(T1), T0).T)
 
   def _get_velodyne_fn(self, drive, t):
     if self.IS_ODOMETRY:
       fname = self.root + '/sequences/%02d/velodyne/%06d.bin' % (drive, t)
     else:
       fname = self.root + \
-          '/' + self.date + '_drive_%04d_sync/velodyne_points/data/%010d.bin' % (
-              drive, t)
+              '/' + self.date + '_drive_%04d_sync/velodyne_points/data/%010d.bin' % (
+                drive, t)
     return fname
 
   def __getitem__(self, idx):
@@ -437,7 +438,7 @@ class KITTIPairDataset(PairDataset):
     matching_search_voxel_size = self.matching_search_voxel_size
     if self.random_scale and random.random() < 0.95:
       scale = self.min_scale + \
-          (self.max_scale - self.min_scale) * random.random()
+              (self.max_scale - self.min_scale) * random.random()
       matching_search_voxel_size *= scale
       xyz0 = scale * xyz0
       xyz1 = scale * xyz1
@@ -522,7 +523,7 @@ class KITTINMPairDataset(KITTIPairDataset):
         all_odo = self.get_video_odometry(drive_id, return_all=True)
         all_pos = np.array([self.odometry_to_positions(odo) for odo in all_odo])
         Ts = all_pos[:, :3, 3]
-        pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3))**2
+        pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
         pdist = np.sqrt(pdist.sum(-1))
         more_than_10 = pdist > 10
         curr_time = inames[0]
@@ -550,7 +551,7 @@ class KITTINMPairDataset(KITTIPairDataset):
         all_pos = np.array([self.odometry_to_positions(odo) for odo in all_odo])
         Ts = all_pos[:, 0, :3]
 
-        pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3))**2
+        pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
         pdist = np.sqrt(pdist.sum(-1))
 
         for start_time in inames:
@@ -571,7 +572,7 @@ class KITTINMPairDataset(KITTIPairDataset):
     if self.IS_ODOMETRY:
       # Remove problematic sequence
       for item in [
-          (8, 15, 58),
+        (8, 15, 58),
       ]:
         if item in self.files:
           self.files.pop(self.files.index(item))
@@ -580,13 +581,184 @@ class KITTINMPairDataset(KITTIPairDataset):
 class ThreeDMatchPairDataset(IndoorPairDataset):
   OVERLAP_RATIO = 0.3
   DATA_FILES = {
-      'train': './config/train_3dmatch.txt',
-      'val': './config/val_3dmatch.txt',
-      'test': './config/test_3dmatch.txt'
+    'train': './config/train_3dmatch.txt',
+    'val': './config/val_3dmatch.txt',
+    'test': './config/test_3dmatch.txt'
   }
 
 
-ALL_DATASETS = [ThreeDMatchPairDataset, KITTIPairDataset, KITTINMPairDataset]
+def neighbors(interval, connectivity=8):
+  assert connectivity in (6, 18, 26)
+  neighbor_starts = [
+    [interval, 0, 0],
+    [-interval, 0, 0],
+    [0, interval, 0],
+    [0, -interval, 0],
+    [0, 0, interval],
+    [0, 0, -interval],
+  ]
+  if connectivity > 6:
+    neighbor_starts.extend([
+      [interval, interval, 0],
+      [interval, -interval, 0],
+      [-interval, interval, 0],
+      [-interval, -interval, 0],
+
+      [0, interval, interval],
+      [0, interval, -interval],
+      [0, -interval, interval],
+      [0, -interval, -interval],
+
+      [interval, 0, interval],
+      [-interval, 0, interval],
+      [interval, 0, -interval],
+      [-interval, 0, -interval],
+    ])
+  if connectivity > 18:
+    neighbor_starts.extend([
+      [interval, interval, interval],
+      [interval, interval, -interval],
+      [interval, -interval, interval],
+      [interval, -interval, -interval],
+      [-interval, interval, interval],
+      [-interval, interval, -interval],
+      [-interval, -interval, interval],
+      [-interval, -interval, -interval],
+    ])
+  return np.array(neighbor_starts, dtype=np.float64)
+
+
+class London3dDataset(PairDataset):
+  OVERLAP_RATIO = 0.3
+  AUGMENT = None
+  DATA_FILES = {
+    'train': './config/train_london.txt',
+    'val': './config/val_london.txt',
+    'test': './config/test_london.txt'
+  }
+  SAMPLES_PER_PCD = 100
+
+  def __init__(self,
+               phase,
+               transform=None,
+               random_rotation=True,
+               random_scale=True,
+               manual_seed=False,
+               config=None):
+    PairDataset.__init__(self, phase, transform, random_rotation, random_scale,
+                         manual_seed, config)
+    self.root = root = config.threed_match_dir
+    logging.info(f"Loading the subset {phase} from {root}")
+
+    subset_names = open(self.DATA_FILES[phase]).read().split()
+    for name in subset_names:
+      fnames = glob.glob(root + "/" + name)
+      assert len(fnames) > 0, f"Make sure that the path {root} has data {name}"
+      for fname in fnames:
+        self.files.append(fname)
+
+    self.cube_size = config.london3d_cube_size
+    self.interval = config.london3d_interval
+    self.min_percent = config.london3d_min_percent
+    self.max_percent = config.london3d_max_percent
+
+    self.cube_dim = np.array([self.cube_size, self.cube_size, self.cube_size], dtype=np.float64)
+    self.neighbor_starts = neighbors(self.interval, 18)
+
+    self.pcds = []
+    for file in self.files:
+      pcd = o3d.io.read_point_cloud(file)
+      pcd = self.quantize_pcd(pcd)
+      self.pcds.append(pcd)
+
+  def quantize_pcd(self, pcd):
+    xyz = pcd.points
+    sel0 = ME.utils.sparse_quantize(xyz / self.voxel_size, return_index=True)
+    pcd.points = o3d.utility.Vector3dVector(np.array(xyz)[sel0])
+    return pcd
+
+  def __len__(self):
+    return len(self.pcds) * self.SAMPLES_PER_PCD
+
+  def get_valid_pair(self, pcd, point, neighbor_offset):
+    # TODO
+    xyz0 = roi_rectangle(pcd.points, point, self.cube_dim)
+    if len(xyz0) == 0:
+      return None
+    neighbor_point = point + neighbor_offset
+    xyz1 = roi_rectangle(pcd.points, neighbor_point, self.cube_dim)
+    if len(xyz1) == 0:
+      return None
+    matching_search_voxel_size = self.matching_search_voxel_size
+
+    if self.random_scale and random.random() < 0.95:
+      scale = self.min_scale + \
+              (self.max_scale - self.min_scale) * random.random()
+      matching_search_voxel_size *= scale
+      xyz0 = scale * xyz0
+      xyz1 = scale * xyz1
+
+    if self.random_rotation:
+      T0 = sample_random_trans(xyz0, self.randg, self.rotation_range)
+      T1 = sample_random_trans(xyz1, self.randg, self.rotation_range)
+      trans = T1 @ np.linalg.inv(T0)
+
+      xyz0 = self.apply_transform(xyz0, T0)
+      xyz1 = self.apply_transform(xyz1, T1)
+    else:
+      trans = np.identity(4)
+
+    pcd0 = make_open3d_point_cloud(xyz0)
+    pcd1 = make_open3d_point_cloud(xyz1)
+
+    overlap_ratio = compute_overlap_ratio(pcd0, pcd1, trans, matching_search_voxel_size)
+
+    if self.min_percent <= overlap_ratio <= self.max_percent:
+      return pcd0, pcd1, trans, matching_search_voxel_size
+    else:
+      return None
+
+  def __getitem__(self, idx):
+    pcd_idx = int(idx / self.SAMPLES_PER_PCD)
+    pcd = self.pcds[pcd_idx]
+
+    res = None
+    while res is None:
+      idx = np.random.choice(len(pcd.points))
+      neighbor_idx = np.random.choice(len(self.neighbor_starts))
+      res = self.get_valid_pair(pcd, pcd.points[idx], self.neighbor_starts[neighbor_idx])
+    pcd0, pcd1, trans, matching_search_voxel_size = res
+
+    # Get matches
+    matches = get_matching_indices(pcd0, pcd1, trans, matching_search_voxel_size)
+
+    # Get features
+    npts0 = len(pcd0.points)
+    npts1 = len(pcd1.points)
+
+    feats_train0, feats_train1 = [], []
+
+    feats_train0.append(np.ones((npts0, 1)))
+    feats_train1.append(np.ones((npts1, 1)))
+
+    feats0 = np.hstack(feats_train0)
+    feats1 = np.hstack(feats_train1)
+
+    # Get coords
+    xyz0 = np.array(pcd0.points)
+    xyz1 = np.array(pcd1.points)
+
+    coords0 = np.floor(xyz0 / self.voxel_size)
+    coords1 = np.floor(xyz1 / self.voxel_size)
+
+    if self.transform:
+      coords0, feats0 = self.transform(coords0, feats0)
+      coords1, feats1 = self.transform(coords1, feats1)
+
+    return xyz0, xyz1, coords0, coords1, feats0, feats1, matches, trans
+
+
+ALL_DATASETS = [ThreeDMatchPairDataset, KITTIPairDataset, KITTINMPairDataset, London3dDataset]
 dataset_str_mapping = {d.__name__: d for d in ALL_DATASETS}
 
 
@@ -610,19 +782,19 @@ def make_data_loader(config, phase, batch_size, num_threads=0, shuffle=None):
     transforms += [t.Jitter()]
 
   dset = Dataset(
-      phase,
-      transform=t.Compose(transforms),
-      random_scale=use_random_scale,
-      random_rotation=use_random_rotation,
-      config=config)
+    phase,
+    transform=t.Compose(transforms),
+    random_scale=use_random_scale,
+    random_rotation=use_random_rotation,
+    config=config)
 
   loader = torch.utils.data.DataLoader(
-      dset,
-      batch_size=batch_size,
-      shuffle=shuffle,
-      num_workers=num_threads,
-      collate_fn=collate_pair_fn,
-      pin_memory=False,
-      drop_last=True)
+    dset,
+    batch_size=batch_size,
+    shuffle=shuffle,
+    num_workers=num_threads,
+    collate_fn=collate_pair_fn,
+    pin_memory=False,
+    drop_last=True)
 
   return loader

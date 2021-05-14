@@ -6,6 +6,22 @@ import open3d as o3d
 from lib.eval import find_nn_cpu
 
 
+def roi_rectangle(pcdarray, minxyz, size):
+  maxxyz = minxyz + size
+  xyz_pts = pcdarray[:, [0, 1, 2]]
+  inidx = np.all((minxyz <= xyz_pts) & (xyz_pts <= maxxyz), axis=1)
+  return pcdarray[inidx]
+
+
+def get_rectangle_pcd(pcdarray, minxyz, size):
+  pts = roi_rectangle(pcdarray, minxyz, size)
+  if len(pts) == 0:
+    return None
+  pcd_voxel = o3d.geometry.PointCloud()
+  pcd_voxel.points = o3d.utility.Vector3dVector(pts)
+  return pcd_voxel
+
+
 def make_open3d_point_cloud(xyz, color=None):
   pcd = o3d.geometry.PointCloud()
   pcd.points = o3d.utility.Vector3dVector(xyz)
