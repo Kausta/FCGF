@@ -60,10 +60,10 @@ def collate_pair_fn(list_data):
   return {
     'pcd0': xyz_batch0,
     'pcd1': xyz_batch1,
-    'sinput0_C': coords_batch0,
-    'sinput0_F': feats_batch0,
-    'sinput1_C': coords_batch1,
-    'sinput1_F': feats_batch1,
+    'sinput0_C': coords_batch0.int(),
+    'sinput0_F': feats_batch0.float(),
+    'sinput1_C': coords_batch1.int(),
+    'sinput1_F': feats_batch1.float(),
     'correspondences': matching_inds_batch,
     'T_gt': trans_batch,
     'len_batch': len_batch
@@ -636,7 +636,6 @@ class London3dDataset(PairDataset):
     'val': './config/val_london.txt',
     'test': './config/test_london.txt'
   }
-  SAMPLES_PER_PCD = 100
 
   def __init__(self,
                phase,
@@ -649,6 +648,11 @@ class London3dDataset(PairDataset):
                          manual_seed, config)
     self.root = root = config.threed_match_dir
     logging.info(f"Loading the subset {phase} from {root}")
+
+    if phase == "train":
+      self.samples_per_pcd = 100
+    else:
+      self.samples_per_pcd = 20
 
     subset_names = open(self.DATA_FILES[phase]).read().split()
     for name in subset_names:
@@ -668,25 +672,18 @@ class London3dDataset(PairDataset):
     self.pcds = []
     for file in self.files:
       pcd = o3d.io.read_point_cloud(file)
-      pcd = self.quantize_pcd(pcd)
       self.pcds.append(pcd)
 
-  def quantize_pcd(self, pcd):
-    xyz = pcd.points
-    sel0 = ME.utils.sparse_quantize(xyz / self.voxel_size, return_index=True)
-    pcd.points = o3d.utility.Vector3dVector(np.array(xyz)[sel0])
-    return pcd
-
   def __len__(self):
-    return len(self.pcds) * self.SAMPLES_PER_PCD
+    return len(self.pcds) * self.samples_per_pcd
 
   def get_valid_pair(self, pcd, point, neighbor_offset):
-    # TODO
-    xyz0 = roi_rectangle(pcd.points, point, self.cube_dim)
+    points = np.asarray(pcd.points)
+    xyz0 = roi_rectangle(points, point, self.cube_dim)
     if len(xyz0) == 0:
       return None
     neighbor_point = point + neighbor_offset
-    xyz1 = roi_rectangle(pcd.points, neighbor_point, self.cube_dim)
+    xyz1 = roi_rectangle(points, neighbor_point, self.cube_dim)
     if len(xyz1) == 0:
       return None
     matching_search_voxel_size = self.matching_search_voxel_size
@@ -708,8 +705,14 @@ class London3dDataset(PairDataset):
     else:
       trans = np.identity(4)
 
+    sel0 = ME.utils.sparse_quantize(xyz0 / self.voxel_size, return_index=True)
+    sel1 = ME.utils.sparse_quantize(xyz1 / self.voxel_size, return_index=True)
+
     pcd0 = make_open3d_point_cloud(xyz0)
     pcd1 = make_open3d_point_cloud(xyz1)
+
+    pcd0.points = o3d.utility.Vector3dVector(np.array(pcd0.points)[sel0])
+    pcd1.points = o3d.utility.Vector3dVector(np.array(pcd1.points)[sel1])
 
     overlap_ratio = compute_overlap_ratio(pcd0, pcd1, trans, matching_search_voxel_size)
 
@@ -719,7 +722,7 @@ class London3dDataset(PairDataset):
       return None
 
   def __getitem__(self, idx):
-    pcd_idx = int(idx / self.SAMPLES_PER_PCD)
+    pcd_idx = int(idx / self.samples_per_pcd)
     pcd = self.pcds[pcd_idx]
 
     res = None
