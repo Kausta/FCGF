@@ -677,12 +677,14 @@ class London3dDataset(PairDataset):
   def __len__(self):
     return len(self.pcds) * self.samples_per_pcd
 
-  def get_valid_pair(self, pcd, point, neighbor_offset):
+  def get_valid_pair(self, pcd, center, neighbor_offset):
     points = np.asarray(pcd.points)
-    xyz0 = roi_rectangle(points, point, self.cube_dim)
+    # Take random points as centers
+    center = center - self.cube_dim / 2
+    xyz0 = roi_rectangle(points, center, self.cube_dim)
     if len(xyz0) == 0:
       return None
-    neighbor_point = point + neighbor_offset
+    neighbor_point = center + neighbor_offset
     xyz1 = roi_rectangle(points, neighbor_point, self.cube_dim)
     if len(xyz1) == 0:
       return None
