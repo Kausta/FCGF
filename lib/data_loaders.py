@@ -672,13 +672,14 @@ class London3dDataset(PairDataset):
     self.pcds = []
     for file in self.files:
       pcd = o3d.io.read_point_cloud(file)
-      self.pcds.append(pcd)
+      pcd_array = np.asarray(pcd.points)
+      self.pcds.append(pcd_array)
+    self.pcds = np.array(self.pcds)
 
   def __len__(self):
     return len(self.pcds) * self.samples_per_pcd
 
-  def get_valid_pair(self, pcd, center, neighbor_offset):
-    points = np.asarray(pcd.points)
+  def get_valid_pair(self, points, center, neighbor_offset):
     # Take random points as centers
     center = center - self.cube_dim / 2
     xyz0 = roi_rectangle(points, center, self.cube_dim)
@@ -725,13 +726,13 @@ class London3dDataset(PairDataset):
 
   def __getitem__(self, idx):
     pcd_idx = int(idx / self.samples_per_pcd)
-    pcd = self.pcds[pcd_idx]
+    points = self.pcds[pcd_idx]
 
     res = None
     while res is None:
-      idx = np.random.choice(len(pcd.points))
+      idx = np.random.choice(len(points))
       neighbor_idx = np.random.choice(len(self.neighbor_starts))
-      res = self.get_valid_pair(pcd, pcd.points[idx], self.neighbor_starts[neighbor_idx])
+      res = self.get_valid_pair(points, points[idx], self.neighbor_starts[neighbor_idx])
     pcd0, pcd1, trans, matching_search_voxel_size = res
 
     # Get matches
