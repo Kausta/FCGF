@@ -650,9 +650,9 @@ class London3dDataset(PairDataset):
     logging.info(f"Loading the subset {phase} from {root}")
 
     if phase == "train":
-      self.samples_per_pcd = 100
+      self.samples_per_pcd = 250
     else:
-      self.samples_per_pcd = 20
+      self.samples_per_pcd = 100
 
     subset_names = open(self.DATA_FILES[phase]).read().split()
     for name in subset_names:

@@ -1,1 +1,1 @@
-Welwyn_Cropped.pcd
+Peterborough_Cropped.pcd
