@@ -726,7 +726,9 @@ class London3dDataset(PairDataset):
 
   def __getitem__(self, idx):
     pcd_idx = int(idx / self.samples_per_pcd)
-    points = self.pcds[pcd_idx]
+    file = self.files[pcd_idx]
+    with open(file, 'rb') as f:
+      points = np.load(f)
 
     res = None
     while res is None:
@@ -734,6 +736,8 @@ class London3dDataset(PairDataset):
       neighbor_idx = np.random.choice(len(self.neighbor_starts))
       res = self.get_valid_pair(points, points[idx], self.neighbor_starts[neighbor_idx])
     pcd0, pcd1, trans, matching_search_voxel_size = res
+
+    points = None
 
     # Get matches
     matches = get_matching_indices(pcd0, pcd1, trans, matching_search_voxel_size)

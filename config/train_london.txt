@@ -1,1 +1,4 @@
-Welwyn_Cropped.pcdHertford_Cropped.pcdChelmsford_Cropped.pcdMarshLane_Cropped.pcd
+Chelmsford_Cropped.npy
+Hertford_Cropped.npy
+MarshLane_Cropped.npy
+Peterborough_Cropped.npy

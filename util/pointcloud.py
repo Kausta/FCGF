@@ -10,7 +10,7 @@ def roi_rectangle(pcdarray, minxyz, size):
   maxxyz = minxyz + size
   xyz_pts = pcdarray[:, [0, 1, 2]]
   inidx = np.all((minxyz <= xyz_pts) & (xyz_pts <= maxxyz), axis=1)
-  return pcdarray[inidx]
+  return pcdarray[inidx].copy()
 
 
 def get_rectangle_pcd(pcdarray, minxyz, size):

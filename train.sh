@@ -38,5 +38,5 @@ python train.py --threed_match_dir /userfiles/nkoprucu16/London3d \
                 --london3d-interval ${INTERVAL} \
                 --london3d-min-percent 0.3 \
                 --london3d-max-percent 0.9 \
-                --train_num_thread 1 \
+                --train_num_thread 4 \
                 --max_epoch ${MAX_EPOCH} \
