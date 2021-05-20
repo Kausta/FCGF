@@ -671,9 +671,9 @@ class London3dDataset(PairDataset):
 
     self.pcds = []
     for file in self.files:
-      pcd = o3d.io.read_point_cloud(file)
-      pcd_array = np.asarray(pcd.points)
-      self.pcds.append(pcd_array)
+      with open(file, 'rb') as f:
+        points = np.load(f)
+      self.pcds.append(points)
     self.pcds = np.array(self.pcds)
 
   def __len__(self):
@@ -726,9 +726,7 @@ class London3dDataset(PairDataset):
 
   def __getitem__(self, idx):
     pcd_idx = int(idx / self.samples_per_pcd)
-    file = self.files[pcd_idx]
-    with open(file, 'rb') as f:
-      points = np.load(f)
+    points = self.pcds[pcd_idx]
 
     res = None
     while res is None:
