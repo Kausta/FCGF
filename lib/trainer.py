@@ -102,7 +102,7 @@ class AlignmentTrainer:
       if osp.isfile(config.resume):
         logging.info("=> loading checkpoint '{}'".format(config.resume))
         state = torch.load(config.resume)
-        self.start_epoch = state['epoch']
+        self.start_epoch = state['epoch'] + 1
         model.load_state_dict(state['state_dict'])
         self.scheduler.load_state_dict(state['scheduler'])
         self.optimizer.load_state_dict(state['optimizer'])
@@ -122,9 +122,9 @@ class AlignmentTrainer:
     if self.test_valid:
       with torch.no_grad():
         val_dict = self._valid_epoch()
-
-      for k, v in val_dict.items():
-        self.writer.add_scalar(f'val/{k}', v, 0)
+      if self.start_epoch <= 1:
+        for k, v in val_dict.items():
+          self.writer.add_scalar(f'val/{k}', v, 0)
 
     for epoch in range(self.start_epoch, self.max_epoch + 1):
       lr = self.scheduler.get_lr()
