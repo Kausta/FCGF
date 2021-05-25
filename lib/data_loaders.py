@@ -587,7 +587,7 @@ class ThreeDMatchPairDataset(IndoorPairDataset):
   }
 
 
-def neighbors(interval, connectivity=8):
+def neighbors(interval, connectivity=6):
   assert connectivity in (6, 18, 26)
   neighbor_starts = [
     [interval, 0, 0],
@@ -650,7 +650,7 @@ class London3dDataset(PairDataset):
     logging.info(f"Loading the subset {phase} from {root}")
 
     if phase == "train":
-      self.samples_per_pcd = 250
+      self.samples_per_pcd = 200
     else:
       self.samples_per_pcd = 100
 
@@ -734,8 +734,6 @@ class London3dDataset(PairDataset):
       neighbor_idx = np.random.choice(len(self.neighbor_starts))
       res = self.get_valid_pair(points, points[idx], self.neighbor_starts[neighbor_idx])
     pcd0, pcd1, trans, matching_search_voxel_size = res
-
-    points = None
 
     # Get matches
     matches = get_matching_indices(pcd0, pcd1, trans, matching_search_voxel_size)

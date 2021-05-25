@@ -5,9 +5,10 @@ export VOXEL_SIZE=${VOXEL_SIZE:-0.01}
 export POSITIVE_PAIR_SEARCH_VOXEL_SIZE_MULTIPLIER=${POSITIVE_PAIR_SEARCH_VOXEL_SIZE_MULTIPLIER:-4}
 export CONV1_KERNEL_SIZE=${CONV1_KERNEL_SIZE:-7}
 export MAX_EPOCH=${MAX_EPOCH:-10000}
-export CUBE_SIZE=${CUBE_SIZE:-4}
-export INTERVAL=${INVERVAL:-2}
+export CUBE_SIZE=${CUBE_SIZE:-2}
+export INTERVAL=${INVERVAL:-1}
 export TIME=$(date +"%Y-%m-%d_%H-%M-%S")
+export DATA_DIR=/kuacc/users/nkoprucu16/London3d
 export OUT_DIR=/kuacc/users/nkoprucu16/outputs/London3d-v${VOXEL_SIZE}-c${CONV1_KERNEL_SIZE}-s${CUBE_SIZE}-i${INTERVAL}/${TIME}
 
 export PYTHONUNBUFFERED="True"
@@ -27,7 +28,7 @@ echo "Version: " $VERSION | tee -a $LOG
 # echo "" | tee -a $LOG
 nvidia-smi | tee -a $LOG
 
-python train.py --threed_match_dir /userfiles/nkoprucu16/London3d \
+python train.py --threed_match_dir ${DATA_DIR} \
                 --out_dir ${OUT_DIR} \
                 --dataset London3dDataset \
                 --batch_size ${BATCH_SIZE} \
@@ -40,3 +41,4 @@ python train.py --threed_match_dir /userfiles/nkoprucu16/London3d \
                 --london3d-max-percent 0.9 \
                 --train_num_thread 4 \
                 --max_epoch ${MAX_EPOCH} \
+                "$@" 2>&1 | tee -a $LOG

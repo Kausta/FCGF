@@ -217,6 +217,9 @@ class ContrastiveLossTrainer(AlignmentTrainer):
     start_iter = (epoch - 1) * (len(data_loader) // iter_size)
 
     data_meter, data_timer, total_timer = AverageMeter(), Timer(), Timer()
+    loss_meter = AverageMeter()
+    pos_loss_meter = AverageMeter()
+    neg_loss_meter = AverageMeter()
 
     # Main training
     for curr_iter in range(len(data_loader) // iter_size):
@@ -278,12 +281,12 @@ class ContrastiveLossTrainer(AlignmentTrainer):
       total_num += 1.0
       total_timer.toc()
       data_meter.update(data_time)
+      loss_meter.update(batch_loss)
+      pos_loss_meter.update(batch_pos_loss)
+      neg_loss_meter.update(batch_neg_loss)
 
       # Print logs
       if curr_iter % self.config.stat_freq == 0:
-        self.writer.add_scalar('train/loss', batch_loss, start_iter + curr_iter)
-        self.writer.add_scalar('train/pos_loss', batch_pos_loss, start_iter + curr_iter)
-        self.writer.add_scalar('train/neg_loss', batch_neg_loss, start_iter + curr_iter)
         logging.info(
             "Train Epoch: {} [{}/{}], Current Loss: {:.3e} Pos: {:.3f} Neg: {:.3f}"
             .format(epoch, curr_iter,
@@ -293,6 +296,22 @@ class ContrastiveLossTrainer(AlignmentTrainer):
                 data_meter.avg, total_timer.avg - data_meter.avg, total_timer.avg))
         data_meter.reset()
         total_timer.reset()
+
+    stat = {
+      'loss': loss_meter.avg,
+      'pos_loss': pos_loss_meter.avg,
+      'neg_loss': neg_loss_meter.avg
+    }
+
+    for k, v in stat.items():
+      self.writer.add_scalar(f'train/{k}', v, epoch)
+
+    logging.info(' '.join([
+      f"Train Epoch: {epoch}",
+      f"Epoch Loss: {loss_meter.avg:.3e},",
+      f"Pos Epoch Loss: {pos_loss_meter.avg:.3e},",
+      f"Neg Epoch Loss: {neg_loss_meter.avg:.3e},",
+    ]))
 
   def _valid_epoch(self):
     # Change the network to evaluation mode
@@ -454,7 +473,12 @@ class HardestContrastiveLossTrainer(ContrastiveLossTrainer):
     data_loader = self.data_loader
     data_loader_iter = self.data_loader.__iter__()
     iter_size = self.iter_size
+
     data_meter, data_timer, total_timer = AverageMeter(), Timer(), Timer()
+    loss_meter = AverageMeter()
+    pos_loss_meter = AverageMeter()
+    neg_loss_meter = AverageMeter()
+
     start_iter = (epoch - 1) * (len(data_loader) // iter_size)
     for curr_iter in range(len(data_loader) // iter_size):
       self.optimizer.zero_grad()
@@ -503,11 +527,11 @@ class HardestContrastiveLossTrainer(ContrastiveLossTrainer):
       total_num += 1.0
       total_timer.toc()
       data_meter.update(data_time)
+      loss_meter.update(batch_loss)
+      pos_loss_meter.update(batch_pos_loss)
+      neg_loss_meter.update(batch_neg_loss)
 
       if curr_iter % self.config.stat_freq == 0:
-        self.writer.add_scalar('train/loss', batch_loss, start_iter + curr_iter)
-        self.writer.add_scalar('train/pos_loss', batch_pos_loss, start_iter + curr_iter)
-        self.writer.add_scalar('train/neg_loss', batch_neg_loss, start_iter + curr_iter)
         logging.info(
             "Train Epoch: {} [{}/{}], Current Loss: {:.3e} Pos: {:.3f} Neg: {:.3f}"
             .format(epoch, curr_iter,
@@ -517,6 +541,22 @@ class HardestContrastiveLossTrainer(ContrastiveLossTrainer):
                 data_meter.avg, total_timer.avg - data_meter.avg, total_timer.avg))
         data_meter.reset()
         total_timer.reset()
+
+    stat = {
+      'loss': loss_meter.avg,
+      'pos_loss': pos_loss_meter.avg,
+      'neg_loss': neg_loss_meter.avg
+    }
+
+    for k, v in stat.items():
+      self.writer.add_scalar(f'train/{k}', v, epoch)
+
+    logging.info(' '.join([
+      f"Train Epoch: {epoch}",
+      f"Epoch Loss: {loss_meter.avg:.3e},",
+      f"Pos Epoch Loss: {pos_loss_meter.avg:.3e},",
+      f"Neg Epoch Loss: {neg_loss_meter.avg:.3e},",
+    ]))
 
 
 class TripletLossTrainer(ContrastiveLossTrainer):
