@@ -730,8 +730,8 @@ class London3dDataset(PairDataset):
 
     res = None
     while res is None:
-      idx = np.random.choice(len(points))
-      neighbor_idx = np.random.choice(len(self.neighbor_starts))
+      idx = self.randg.choice(len(points))
+      neighbor_idx = self.randg.choice(len(self.neighbor_starts))
       res = self.get_valid_pair(points, points[idx], self.neighbor_starts[neighbor_idx])
     pcd0, pcd1, trans, matching_search_voxel_size = res
 
@@ -771,7 +771,7 @@ dataset_str_mapping = {d.__name__: d for d in ALL_DATASETS}
 def make_data_loader(config, phase, batch_size, num_threads=0, shuffle=None):
   assert phase in ['train', 'trainval', 'val', 'test']
   if shuffle is None:
-    shuffle = phase != 'test'
+    shuffle = phase in ['train', 'trainval']
 
   if config.dataset not in dataset_str_mapping.keys():
     logging.error(f'Dataset {config.dataset}, does not exists in ' +
